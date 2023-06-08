@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="w3.css">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
+</head>
+<body>
+    <div id="modal" class="w3-modal">
+            <div class="w3-modal-content">
+              <div class="w3-container">
+                <span onclick="openModal()" class="w3-button w3-display-topright">&times;</span>
+
+              </div>
+            </div>
+    </div>
+    <div class="w3-row">
+        <div class="w3-cell">
+            <div class="w3-margin w3-padding">
+                <i>SET FLIGHT MODE: </i>
+                <label>
+                    <input class="w3-radio" type="radio" name="gender" value="male" checked>
+                </label>
+                <label>GUIDED</label>
+
+                <label>
+                    <input class="w3-radio" type="radio" name="gender" value="female">
+                </label>
+                <label>AUTO</label>
+            </div>
+        </div>
+        <div class="w3-cell w3-padding">
+            GPS FIX: <strong>NO GPS</strong>
+        </div>
+        <div class="w3-cell w3-padding">
+            SATELLITES AVAILABLE: <strong>0</strong>
+        </div>
+        <div class="w3-cell w3-padding">
+            MODE: <strong>STABILIZE</strong>
+        </div>
+        <div class="w3-cell w3-padding">
+            ITEM REACHED: <strong>None</strong>
+        </div>
+        <div class="w3-cell">
+            <div class="w3-margin w3-padding">
+                <button class="w3-btn w3-green">UPLOAD MISSION</button>
+            </div>
+        </div>
+    </div>
+    <div class="w3-row">
+        <div class="w3-cell">
+            <div class="w3-row">
+        <div class="w3-cell">
+            <div class="w3-margin w3-padding">
+                <button class="w3-btn w3-blue-gray">ARM</button>
+            </div>
+        </div>
+        <div class="w3-cell">
+            <div class="w3-margin w3-padding">
+                <button class="w3-btn w3-blue-gray">TAKE OFF</button>
+            </div>
+        </div>
+        <div class="w3-cell">
+            <div class="w3-margin w3-padding">
+                <button class="w3-btn w3-blue-gray">LAND</button>
+            </div>
+        </div>
+                <div class="w3-cell">
+            <div class="w3-margin w3-padding">
+                <button class="w3-btn w3-blue-gray">DISARM</button>
+            </div>
+        </div>
+                <div class="w3-cell">
+                    <div class="w3-margin w3-padding">
+                    <div class="w3-dropdown-click">
+                        <button id="cmd_button" onclick="openDropdown()" class="w3-button w3-amber">CHOOSE CMD FOR POINT</button>
+                            <div id="dropdown_cmd" class="w3-dropdown-content w3-bar-block w3-border">
+                                <button onclick="setCMD('DELAY')" class="w3-bar-item w3-btn">DELAY</button>
+                                <button onclick="setCMD('LOITER')" class="w3-bar-item w3-btn">LOITER</button>
+                                <button onclick="setCMD('SPLINE_WAYPOINT')" class="w3-bar-item w3-btn">SPLINE WAYPOINT</button>
+                                <button onclick="setCMD('WAYPOINT')" class="w3-bar-item w3-btn">WAYPOINT</button>
+                                <button onclick="setCMD('RETURN_TO_LAUNCH')" class="w3-bar-item w3-btn">RETURN TO LAUNCH</button>
+                                <button onclick="setCMD('PAYLOAD_PLACE')" class="w3-bar-item w3-btn" disabled>PAYLOAD PLACE</button>
+                            </div>
+                    </div>
+                </div>
+                </div>
+                </div>
+        </div>
+        <div class="w3-cell">
+            <div class="w3-row">
+                <ol class="w3-ul w3-border" id="list"></ol>
+            </div>
+        </div>
+    </div>
+    <div id="map" style="width: 100%; height: 80vh;"></div>
+<!--    <label for="input"></label><input type="text" id="input">-->
+<!--    <input type="submit" value="Submit" onclick="enter(parseInt(document.getElementById('input').value))">-->
+
+<!--    <h3 id="output"></h3>-->
+<!--    <h3 id="sum"></h3>-->
+
+<script>
+   (g=>{let h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});let d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+        key: "AIzaSyCc1JFNUrqj0nV2z52TpgHgPP27a1xxO9o",
+        v: "weekly",
+    // Use the 'v' parameter to indicate the version to use (weekly, beta, alpha, etc.).
+    // Add other bootstrap parameters as needed, using camel case.
+   });
+
+   let myWebSocket;
+    let map;
+
+    let coordsArray = [];
+
+    let cmd = "";
+
+    let readyForSet = false;
+
+    let isModalOpen = false;
+    let values = [];
+    let list = document.getElementById("list");
+
+    async function initMap() {
+      // The location of Uluru
+      const position = { lat: 41.793817, lng: 44.824370 };
+      // Request needed libraries.
+      //@ts-ignore
+      const { Map } = await google.maps.importLibrary("maps");
+      const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
+      // The map, centered at Uluru
+      map = new Map(document.getElementById("map"), {
+        zoom: 20,
+        center: position, draggable: true,
+        mapId: google.maps.MapTypeId.ROADMAP,
+      });
+
+      // The marker, positioned at Uluru
+      let marker = new AdvancedMarkerElement({
+        map: map,
+        position: position,
+          draggable: true,
+        title: "POS",
+      });
+
+      // Create the initial InfoWindow.
+      let infoWindow = new google.maps.InfoWindow({
+        content: "You are here",
+        position: position,
+          draggable: true,
+      });
+
+      // marker.infoWindow.setDraggable(true);
+
+      infoWindow.open(map);
+
+      let endpoint = "ws://127.0.0.1:8000/ws"// document.getElementById("endpoint").value;
+        if (myWebSocket !== undefined) {
+            myWebSocket.close()
+        }
+
+        myWebSocket = new WebSocket(endpoint);
+        myWebSocket.onmessage = function(event) {
+            console.log(event);
+            let len;
+            if (event.data.size === undefined) {
+                len = event.data.length
+            } else {
+                len = event.data.size
+            }
+            console.log("onmessage. size: " + len + ", content: " + event.data);
+            let propsOvMap = JSON.parse(event.data).data;
+            if (typeof propsOvMap !== 'undefined') {
+                marker.setMap(null);
+                // console.log("Moving");
+                let latLng = new google.maps.LatLng(propsOvMap.lat, propsOvMap.lng);
+                // Create a new InfoWindow.
+                // Close the current InfoWindow.
+                marker = new google.maps.Marker({
+                position: latLng,
+                map: map,
+                    draggable: true,
+                title: "We are here",
+                    id: event.timeStamp,
+            });
+                marker.setPosition(latLng);
+                updateMap();
+            }
+            console.log(map.getBounds());
+        }
+
+      // Configure the click listener.
+      map.addListener("click", (mapsMouseEvent) => {
+        // Close the current InfoWindow.
+        infoWindow.close();
+        // Create a new InfoWindow.
+        infoWindow = new google.maps.InfoWindow({
+          position: mapsMouseEvent.latLng,
+            draggable: true,
+        });
+
+        let jsonMapData = mapsMouseEvent.latLng.toJSON();
+        jsonMapData.latInt32 = Math.round((jsonMapData.lat + 90) * 1000000);
+        jsonMapData.lonInt32 = Math.round((jsonMapData.lng + 90) * 1000000);
+        if (cmd !== "") {
+            jsonMapData.alt = prompt("Please provide alt (m): ");
+            jsonMapData.loiter_time = prompt("Please provide loiter time (s): ");
+            // jsonMapData.alt = parseInt(document.getElementById("alt_value").value);
+            // jsonMapData.loiter_time = parseInt(document.getElementById("loiter_time_value").value);
+            jsonMapData.cmd = cmd;
+            jsonMapData.order_index = coordsArray.length;
+            coordsArray.push(jsonMapData);
+            infoWindow.setContent(JSON.stringify(jsonMapData, null, 2));
+            // infoWindow.setDraggable(true);
+            // infoWindow.open(map);
+            updateMap();
+            enter("#: " + coordsArray.length + " lat: " + jsonMapData.lat + " lng: " + jsonMapData.lng + " alt: " + jsonMapData.alt + " loiter time: " + jsonMapData.loiter_time + " CMD: " + cmd);
+            cmd = "";
+            document.getElementById("cmd_button").innerText = "CHOOSE CMD";
+        } else {
+            alert("CMD Required...");
+        }
+
+      });
+    }
+    initMap();
+    async function updateMap() {
+        let marker;
+        for (let i = 0; i < coordsArray.length; i++) {
+          marker = new google.maps.Marker({
+            position: new google.maps.LatLng(coordsArray[i].lat, coordsArray[i].lng),
+            map: map
+          });
+          google.maps.event.addListener(marker, 'click', (function(marker, i) {
+            return function() {
+              infowindow.setContent("Waypoint" + i);
+              infowindow.open(map, marker);
+            }
+          })(marker, i));
+        }
+        const flightPlanCoordinates = coordsArray.map((item) => ({
+            lat: item.lat, lng: item.lng
+        }));
+        const flightPath = new google.maps.Polyline({
+            path: flightPlanCoordinates,
+            geodesic: true,
+            strokeColor: "#d59412",
+            strokeOpacity: 1.0,
+            strokeWeight: 2,
+        });
+        flightPath.setMap(map);
+    }
+
+    function connectToWS() {
+        let endpoint = "ws://127.0.0.1:8000/ws"// document.getElementById("endpoint").value;
+        if (myWebSocket !== undefined) {
+            myWebSocket.close()
+        }
+
+        myWebSocket = new WebSocket(endpoint);
+
+        myWebSocket.onmessage = function(event) {
+            console.log(event);
+            let len;
+            if (event.data.size === undefined) {
+                len = event.data.length
+            } else {
+                len = event.data.size
+            }
+            console.log("onmessage. size: " + len + ", content: " + event.data);
+            let propsOvMap = event.data;
+            let marker;
+            if (typeof propsOvMap.data !== 'undefined') {
+                // console.log("Moving");
+                let latlng = new google.maps.LatLng(propsOvMap.data.lat, propsOvMap.data.lng);
+                // infoWindow.close();
+                // infoWindow = new google.maps.InfoWindow({
+                //     position: latlng,
+                // });
+                // marker = new google.maps.Marker({
+                //     position: latlng,
+                //     map: map
+                // });
+                // map.setCenter(propsOvMap.data.lat, propsOvMap.data.lng); //Here center the map.
+                // marker.setPosition(latlng);
+                // marker.setPosition(latlng);
+                // map.panTo(latlng);
+                // infowindow.open(map, marker);
+                marker = new google.maps.Marker({
+                    position: latlng,
+                    map: map
+                });
+                  google.maps.event.addListener(marker, 'click', (function(marker) {
+                    return function() {
+                      infowindow.setContent("Waypoint" + i);
+                      infowindow.open(map, marker);
+                    }
+                  })(marker));
+            }
+
+        }
+
+        myWebSocket.onopen = function(evt) {
+            console.log("onopen.");
+        };
+
+        myWebSocket.onclose = function(evt) {
+            console.log("onclose.");
+        };
+
+        myWebSocket.onerror = function(evt) {
+            console.log("Error!");
+        };
+    }
+
+    function sendMsg() {
+        let message = document.getElementById("myMessage").value;
+        myWebSocket.send(message);
+    }
+
+    function closeConn() {
+        myWebSocket.close();
+    }
+    async function sendMissionItemAUTO(lat, lon, alt, loiterTime) {
+      const response = await fetch("http://example.com/movies.json");
+      const jsonData = await response.json();
+      console.log(jsonData);
+    }
+
+    function refreshValues() {
+        values = [];
+        let lis = list.querySelectorAll("li");
+        for (let li of lis) values.push(parseInt(li.innerText));
+        // output.innerText = "Output: " + values.join(",");
+        let sumVal = 0;
+        for (let val of values) sumVal += val;
+        // sum.innerText = "Sum: " + sumVal;
+    }
+
+    function enter(value) {
+        let liItems = list.querySelectorAll("li");
+        let text = "";
+        for (let li of liItems) {
+            let currentValue = parseInt(li.innerText);
+            if (value < currentValue) {
+                text += '<li onclick="remove(this);">' + value + "</li>";
+                value = undefined;
+            }
+            text += li.outerHTML;
+        }
+        if (value !== undefined) {
+            text += '<li onclick="remove(this);">' + value + '</li>';
+        }
+        list.innerHTML = text;
+        refreshValues();
+    }
+
+    function remove(what) {
+        what.remove();
+        refreshValues();
+    }
+
+    function openModal () {
+        if (!isModalOpen) {
+            document.getElementById("modal").style.display = 'block';
+            isModalOpen = true;
+        } else {
+            document.getElementById("modal").style.display = 'none';
+            isModalOpen = false;
+        }
+    }
+    function openDropdown() {
+      let x = document.getElementById("dropdown_cmd");
+      if (x.className.indexOf("w3-show") === -1) {
+        x.className += " w3-show";
+      } else {
+        x.className = x.className.replace(" w3-show", "");
+      }
+    }
+
+    function setCMD (value) {
+        cmd = value;
+        document.getElementById("cmd_button").innerText = "CMD: " + cmd;
+        let x = document.getElementById("dropdown_cmd");
+        if (x.className.indexOf("w3-show") === -1) {
+            x.className += " w3-show";
+        } else {
+            x.className = x.className.replace(" w3-show", "");
+        }
+    }
+</script>
+
+</body>
+</html>
